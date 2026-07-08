@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: media_stats_db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-media_stats}
+      POSTGRES_USER: ${POSTGRES_USER:-media_stats}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
+    volumes:
+      - media_stats_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+
+  collector:
+    build: .
+    container_name: media_stats_collector
+    env_file: .env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - db
+    networks:
+      - torrents_media
+    restart: unless-stopped
+
+  api:
+    build: .
+    container_name: media_stats_api
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    env_file: .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    networks:
+      - torrents_media
+    restart: unless-stopped
+
+networks:
+  torrents_media:
+    external: true
+
+volumes:
+  media_stats_data:
